@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// encuentrame.bo — Reglas de Cloud Storage
+// Fotos de aperturas y productos: escribe solo el dueño, lee el público
+// (las fotos de puestos son públicas por diseño del producto).
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // openings/{uid}/{openingId}.jpg — foto de verificación de apertura
+    match /openings/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 4 * 1024 * 1024        // máx 4 MB (red 2G/3G)
+        && request.resource.contentType.matches('image/(jpeg|webp|png)');
+      allow delete: if false;
+    }
+
+    // products/{uid}/{stallId}/{fileName} — hasta 2 fotos de productos
+    match /products/{uid}/{stallId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 4 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|webp|png)');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // voice/{uid}/{fileName} — audios efímeros para inventario/contabilidad
+    match /voice/{uid}/{fileName} {
+      allow read: if false; // solo el backend los procesa
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*');
+      allow delete: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

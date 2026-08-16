@@ -1,0 +1,110 @@
+rules_version = '2';
+
+// =============================================================
+// encuentrame.bo — Reglas de seguridad Firestore (RLS)
+// Principio: aislamiento por dueño + validación de esquema en el
+// motor de datos. Ninguna capa superior es de confianza.
+// =============================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    function isSeller() {
+      return signedIn() && request.auth.token.seller == true;
+    }
+    function incomingHas(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    function noExtra(allowed) {
+      return request.resource.data.keys().hasOnly(allowed);
+    }
+    function shortStr(v, max) {
+      return v is string && v.size() > 0 && v.size() <= max;
+    }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && incomingHas(['displayName', 'roles', 'createdAt'])
+        && noExtra(['displayName', 'roles', 'phone', 'photoUrl', 'createdAt'])
+        && shortStr(request.resource.data.displayName, 80)
+        && request.resource.data.roles is list
+        && request.resource.data.createdAt == request.time;
+      allow update: if isOwner(uid)
+        && noExtra(['displayName', 'roles', 'phone', 'photoUrl', 'createdAt', 'updatedAt'])
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false; // baja lógica vía backend
+    }
+
+    // ---------- stalls (puestos) ----------
+    match /stalls/{stallId} {
+      allow read: if true; // catálogo público
+      allow create: if isSeller()
+        && request.resource.data.ownerUid == request.auth.uid
+        && incomingHas(['ownerUid', 'name', 'categoryId', 'status', 'createdAt'])
+        && noExtra(['ownerUid', 'name', 'categoryId', 'address', 'privacyRadius', 'status', 'createdAt', 'updatedAt'])
+        && shortStr(request.resource.data.name, 80)
+        && shortStr(request.resource.data.categoryId, 40)
+        && request.resource.data.status == 'closed'
+        && request.resource.data.createdAt == request.time;
+      allow update: if isOwner(resource.data.ownerUid)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        // el estado abierto/cerrado SOLO lo cambia el backend (Admin SDK)
+        && request.resource.data.status == resource.data.status;
+      allow delete: if isOwner(resource.data.ownerUid);
+
+      // ---------- products (subcolección) ----------
+      match /products/{productId} {
+        allow read: if true;
+        allow create, update: if isOwner(get(/databases/$(database)/documents/stalls/$(stallId)).data.ownerUid)
+          && incomingHas(['name'])
+          && noExtra(['name', 'masterId', 'price', 'unit', 'stock', 'source', 'photoUrl', 'createdAt', 'updatedAt'])
+          && shortStr(request.resource.data.name, 80)
+          && (!('price' in request.resource.data) || (request.resource.data.price is number && request.resource.data.price >= 0));
+        allow delete: if isOwner(get(/databases/$(database)/documents/stalls/$(stallId)).data.ownerUid);
+      }
+    }
+
+    // ---------- openings (aperturas: evento inmutable) ----------
+    match /openings/{openingId} {
+      allow read: if true;
+      allow create: if isSeller()
+        && request.resource.data.ownerUid == request.auth.uid
+        && incomingHas(['ownerUid', 'stallId', 'status', 'geohash', 'lat', 'lng', 'photoPath', 'createdAt'])
+        && noExtra(['ownerUid', 'stallId', 'stallName', 'categoryId', 'status', 'geohash', 'lat', 'lng', 'photoPath', 'createdAt'])
+        && request.resource.data.status == 'pending' // la IA (backend) lo pasa a verified/rejected
+        && shortStr(request.resource.data.geohash, 12)
+        && request.resource.data.lat is number && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
+        && request.resource.data.lng is number && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
+        && request.resource.data.createdAt == request.time
+        && get(/databases/$(database)/documents/stalls/$(request.resource.data.stallId)).data.ownerUid == request.auth.uid;
+      allow update, delete: if false; // append-only: solo Cloud Functions
+    }
+
+    // ---------- ledgers (contabilidad privada) ----------
+    match /ledgers/{uid}/entries/{entryId} {
+      allow read, create: if isOwner(uid);
+      allow update, delete: if false; // libro inmutable: historial financiero verificable
+    }
+
+    // ---------- tablas maestras y meta-índices: solo lectura ----------
+    match /master_categories/{id} { allow read: if true; allow write: if false; }
+    match /master_products/{id}   { allow read: if true; allow write: if false; }
+    match /search_index/{id}      { allow read: if true; allow write: if false; }
+    match /geo_tiles/{id}         { allow read: if true; allow write: if false; }
+    match /config/{id}            { allow read: if true; allow write: if false; }
+
+    // ---------- default deny ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

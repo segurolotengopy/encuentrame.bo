@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tipografía del sistema: 0 KB de fuentes para 2G/3G */
+html { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+
+/* Objetivos táctiles grandes: usuarios con guantes, sol directo, apuro */
+button, a.btn { min-height: 48px; }

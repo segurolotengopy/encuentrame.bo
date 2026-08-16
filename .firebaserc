@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "encuentramebo-1",
+    "production": "encuentramebo-1"
+  }
+}
