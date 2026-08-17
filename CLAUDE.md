@@ -25,3 +25,11 @@ Proyecto GCP: `encuentramebo-1` (us-central1). Deploy SOLO vía GitHub Actions (
 
 ## Comandos útiles
 pnpm emulators · pnpm dev · pnpm typecheck · pnpm test:rules · pnpm migrate
+
+## Agentes especializados
+El equipo trabaja con once agentes en `.claude/agents/` (ver su README para el mapa
+de responsabilidades y las cadenas de trabajo). Reglas de uso:
+- `seguridad` es de solo lectura por diseño: audita, no corrige. La corrección la
+  aplica el agente de dominio y luego se re-verifica.
+- Antes de fusionar a `main`: `seguridad` y `qa` deben haber revisado el cambio.
+- Un solo agente escribiendo un mismo dominio a la vez, para evitar conflictos.
