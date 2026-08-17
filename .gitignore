@@ -1,6 +1,7 @@
 node_modules/
 dist/
-lib/
+# Salida de compilación de las funciones (NO ignorar functions/src/lib/)
+functions/lib/
 .env
 .env.local
 *.local

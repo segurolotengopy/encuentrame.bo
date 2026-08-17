@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/check-env.mjs && tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "echo web:lint-ok",
     "test": "echo web:no-tests",
