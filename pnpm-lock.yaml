@@ -96,28 +96,28 @@ importers:
 
   functions:
     dependencies:
-      '@encuentrame/shared':
-        specifier: workspace:*
-        version: link:../packages/shared
       firebase-admin:
         specifier: ^13.0.0
         version: 13.10.0(@firebase/app-compat@0.4.2)(@firebase/app@0.13.2)
       firebase-functions:
         specifier: ^6.1.0
         version: 6.6.0(firebase-admin@13.10.0(@firebase/app-compat@0.4.2)(@firebase/app@0.13.2))
-      hono:
-        specifier: ^4.6.0
-        version: 4.13.2
-      zod:
-        specifier: ^3.23.8
-        version: 3.25.76
     devDependencies:
+      '@encuentrame/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
       esbuild:
         specifier: ^0.24.0
         version: 0.24.2
+      hono:
+        specifier: ^4.6.0
+        version: 4.13.2
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
 
   packages/shared:
     dependencies:
