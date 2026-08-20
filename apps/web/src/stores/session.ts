@@ -1,7 +1,7 @@
 /** Estado global mínimo (Zustand): solo sesión y rol activo. El estado de
  *  servidor vive en TanStack Query + caché offline de Firestore. */
 import { create } from 'zustand';
-import type { User } from '../services/firebase';
+import type { User } from 'firebase/auth';
 
 export type ActiveRole = 'buyer' | 'seller' | null;
 
