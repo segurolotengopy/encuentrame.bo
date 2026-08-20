@@ -18,3 +18,5 @@ coverage/
 *.json.key
 *key*.json
 service-account*.json
+# Paquete mínimo que se sube a Cloud Build (lo genera prepare-deploy.mjs)
+functions/deploy/
