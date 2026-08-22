@@ -17,6 +17,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { api } from '../../services/api-client';
+import { ensureSellerClaim } from '../auth/useAuth';
 
 interface StallDoc {
   id: string;
@@ -64,13 +65,26 @@ export function SellerDashboard() {
 
   const createStall = useMutation({
     mutationFn: async () => {
-      await addDoc(collection(db, 'stalls'), {
+      const stall = {
         ownerUid: user!.uid,
         name: newName.trim(),
         categoryId: newCategory,
         status: 'closed',
         createdAt: serverTimestamp(),
-      });
+      };
+      try {
+        await addDoc(collection(db, 'stalls'), stall);
+      } catch (err) {
+        if ((err as { code?: string }).code !== 'permission-denied') throw err;
+        // El claim `seller` aún no viaja en este token: se refresca y se reintenta.
+        const listo = await ensureSellerClaim(user!);
+        if (!listo) {
+          throw new Error(
+            'Tu cuenta todavía se está habilitando para vender. Espera un momento y vuelve a intentarlo.',
+          );
+        }
+        await addDoc(collection(db, 'stalls'), stall);
+      }
     },
     onSuccess: () => {
       setNewName('');
@@ -128,13 +142,25 @@ export function SellerDashboard() {
               <option value="artesania">Artesanía</option>
             </select>
             <Button type="submit" className="w-full" disabled={createStall.isPending}>
-              Crear puesto
+              {createStall.isPending ? 'Creando…' : 'Crear puesto'}
             </Button>
+            {createStall.isError && (
+              <p role="alert" className="text-center text-sm text-red-600">
+                {createStall.error instanceof Error && createStall.error.message.length < 120
+                  ? createStall.error.message
+                  : 'No pudimos crear el puesto. Revisa tu conexión e intenta otra vez.'}
+              </p>
+            )}
           </form>
         </Card>
       )}
 
       <section className="mt-4 space-y-3">
+        {stalls.isError && (
+          <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+            No pudimos cargar tus puestos. Revisa tu conexión e intenta otra vez.
+          </p>
+        )}
         {(stalls.data ?? []).map((stall) => (
           <Card key={stall.id} className="flex items-center justify-between">
             <div>
