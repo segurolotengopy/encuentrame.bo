@@ -4,7 +4,13 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 // PWA offline-first optimizada para 2G/3G y gama baja:
 // - precache del shell → segunda visita instantánea y funcional offline
-// - MapLibre en chunk diferido (solo se descarga al abrir el mapa)
+// - MapLibre y Firebase quedan fuera del bundle inicial por sus import() dinámicos
+//
+// Sin manualChunks a propósito: nombrar los chunks a mano hacía que Vite emitiera
+// <link rel="modulepreload"> para maplibre y firebase en index.html, así que se
+// descargaban en la carga inicial pese a estar detrás de import() diferidos —
+// justo lo contrario de lo que buscaba esa configuración. Rollup ya separa los
+// chunks correctamente a partir de los import() dinámicos.
 export default defineConfig({
   plugins: [
     react(),
@@ -42,13 +48,5 @@ export default defineConfig({
   ],
   build: {
     target: 'es2020',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          maplibre: ['maplibre-gl'],
-          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
-        },
-      },
-    },
   },
 });
