@@ -46,6 +46,44 @@ export async function ensureProfile(user: User, roles: Role[]): Promise<void> {
       createdAt: serverTimestamp(),
     });
   }
+  // Sin bloquear el registro: va calentando el token mientras el usuario navega.
+  if (roles.includes('seller')) void waitForSellerClaim(user);
+}
+
+/**
+ * Espera a que el custom claim `seller` aparezca en el ID token.
+ *
+ * El claim lo escribe el trigger de Functions DESPUÉS de que el perfil llega a
+ * Firestore, así que el token que el navegador tiene en mano se emitió sin él y
+ * las Security Rules (`isSeller()`) rechazan la primera escritura del vendedor.
+ * Solo un refresco forzado del token lo trae; si no, el usuario queda bloqueado
+ * hasta que el token caduque solo (hasta una hora).
+ */
+export async function waitForSellerClaim(user: User, attempts = 6): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    const { claims } = await user.getIdTokenResult(true);
+    if (claims.seller === true) return true;
+    await new Promise((resolve) => setTimeout(resolve, 500 * (i + 1)));
+  }
+  return false;
+}
+
+/**
+ * Deja al usuario listo para vender: añade el rol `seller` al perfil si le falta
+ * (quien se registró solo como comprador y luego elige "Vender") y espera el claim.
+ */
+export async function ensureSellerClaim(user: User): Promise<boolean> {
+  const [{ db }, { doc, getDoc, updateDoc, arrayUnion, serverTimestamp }] = await Promise.all([
+    loadFirebase(),
+    import('firebase/firestore'),
+  ]);
+  const ref = doc(db, 'users', user.uid);
+  const snap = await getDoc(ref);
+  const roles = (snap.data()?.roles as Role[] | undefined) ?? [];
+  if (snap.exists() && !roles.includes('seller')) {
+    await updateDoc(ref, { roles: arrayUnion('seller'), updatedAt: serverTimestamp() });
+  }
+  return waitForSellerClaim(user);
 }
 
 /** Mismo contrato que antes; cada método carga el SDK al invocarse. */

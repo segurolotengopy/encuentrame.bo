@@ -21,14 +21,17 @@ export const api = onRequest(
   },
   async (req, res) => {
     const url = new URL(req.url, `https://${req.headers.host ?? 'localhost'}`);
+    const raw = req.rawBody as Buffer | undefined;
+    const rawBody = raw ? new Uint8Array(raw) : undefined;
     const request = new Request(url.toString(), {
       method: req.method,
       headers: Object.entries(req.headers).flatMap(([k, v]) =>
         v === undefined ? [] : [[k, Array.isArray(v) ? v.join(',') : v] as [string, string]],
       ),
-      body: ['GET', 'HEAD'].includes(req.method)
-        ? undefined
-        : ((req.rawBody as Buffer | undefined)?.buffer as ArrayBuffer | undefined),
+      // `rawBody` se pasa tal cual: leer su `.buffer` devolvía el pool completo
+      // de Node (con offset), no el cuerpo — la API recibía basura y respondía
+      // 400 invalid_payload en todo POST.
+      body: ['GET', 'HEAD'].includes(req.method) ? undefined : rawBody,
     });
     const response = await app.fetch(request);
     res.status(response.status);
