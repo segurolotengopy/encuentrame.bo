@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "@encuentrame/shared": "workspace:*",
-    "esbuild": "^0.24.0",
+    "esbuild": "^0.28.1",
     "hono": "^4.6.0",
     "typescript": "^5.6.3",
     "zod": "^3.23.8"
