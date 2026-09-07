@@ -46,6 +46,12 @@ jobs:
 
       - name: Deploy functions
         run: pnpm exec firebase deploy --only functions --project ${{ vars.GCP_PROJECT_ID }} --non-interactive --force
+        env:
+          # `defineString` resuelve los parámetros desde el entorno al desplegar.
+          # Sin esto, `--non-interactive` tomaría el predeterminado ("false") y
+          # el interruptor seguiría sin existir. Mismo mecanismo que las VITE_*
+          # del build, para no tener dos formas de configurar lo mismo.
+          APP_CHECK_ENFORCE: ${{ vars.APP_CHECK_ENFORCE }}
 
       - name: Deploy hosting
         run: pnpm exec firebase deploy --only hosting --project ${{ vars.GCP_PROJECT_ID }} --non-interactive
