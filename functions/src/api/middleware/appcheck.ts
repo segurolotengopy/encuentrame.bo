@@ -21,10 +21,29 @@ const appCheckEnforce = defineString('APP_CHECK_ENFORCE', {
 });
 
 /**
+ * Rutas exentas de atestación, deliberadamente.
+ *
+ * `/v1/health` es una sonda de vida: no devuelve datos del negocio y tiene que
+ * poder consultarla quien **no puede atestar** — el smoke test del pipeline y
+ * cualquier monitor externo de disponibilidad. Al encender el enforcement el
+ * 2026-09-07, ese `curl` plano empezó a recibir `401` y dejó todos los
+ * despliegues en rojo pese a desplegarse bien.
+ *
+ * La alternativa era que el smoke test afirmara el `401`, pero eso lo degrada:
+ * pasaría aunque todo lo de abajo estuviera roto. Un control que demuestra
+ * menos de lo que aparenta es peor que no tenerlo.
+ *
+ * La lista se mantiene **mínima y explícita**: cada entrada es superficie sin
+ * autenticar. Añadir una exige justificar qué expone.
+ */
+const SIN_ATESTACION = new Set(['/v1/health']);
+
+/**
  * App Check: primer anillo Zero-Trust — solo la PWA legítima (atestada por
  * reCAPTCHA Enterprise) puede consumir la API. En emulador se omite.
  */
 export const verifyAppCheck: MiddlewareHandler = async (c, next) => {
+  if (SIN_ATESTACION.has(c.req.path)) return next();
   // `.value()` se lee DENTRO del handler, en tiempo de ejecución. A nivel de
   // módulo, el análisis que hace el CLI al desplegar aún no tiene el valor
   // resuelto y devolvería el predeterminado.
