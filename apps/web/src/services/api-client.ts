@@ -4,17 +4,24 @@
  * los mismos esquemas Zod — imposible desincronizarlos.
  */
 import type { CreateOpeningInput, ProductProposal, SearchResultItem } from '@encuentrame/shared';
-import { firebaseAuth } from './firebase.js';
+import { firebaseAuth, firebaseAppCheck } from './firebase.js';
 
 const BASE = '/v1';
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = await firebaseAuth.currentToken();
+  // Dos atestaciones distintas y complementarias: `Authorization` dice QUIÉN
+  // llama; `X-Firebase-AppCheck`, que la llamada viene de la PWA legítima.
+  // En paralelo, para no encadenar dos esperas en el camino crítico.
+  const [token, appCheckToken] = await Promise.all([
+    firebaseAuth.currentToken(),
+    firebaseAppCheck.currentToken(),
+  ]);
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
       ...init.headers,
     },
   });
