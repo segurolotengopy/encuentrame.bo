@@ -43,4 +43,36 @@ copyFileSync(resolve(functionsDir, 'lib/index.js'), resolve(outDir, 'index.js'))
 const link = resolve(outDir, 'node_modules');
 if (!existsSync(link)) symlinkSync(resolve(functionsDir, 'node_modules'), link, 'dir');
 
-console.log(`deploy/ listo — dependencias: ${EXTERNALS.join(', ')}`);
+// Parámetros de `defineString`.
+//
+// firebase-tools NO los lee de `process.env`: los resuelve desde ficheros dotenv
+// del directorio que `firebase.json` declara como `source` — o sea este, no
+// `functions/`. Pasarlos por entorno falla con «In non-interactive mode but have
+// no value for …» aunque la variable esté definida.
+//
+// El valor sigue viviendo en un solo sitio (`vars.*` en CI); acá solo se
+// materializa en el fichero que la herramienta consume. No se versiona:
+// `.gitignore` cubre `.env.*`.
+const projectId =
+  process.env.GCP_PROJECT_ID ??
+  process.env.GCLOUD_PROJECT ??
+  (() => {
+    try {
+      return JSON.parse(readFileSync(resolve(functionsDir, '../.firebaserc'), 'utf8')).projects
+        ?.default;
+    } catch {
+      return undefined;
+    }
+  })();
+
+if (projectId) {
+  writeFileSync(
+    resolve(outDir, `.env.${projectId}`),
+    `APP_CHECK_ENFORCE=${process.env.APP_CHECK_ENFORCE || 'false'}\n`,
+  );
+}
+
+console.log(
+  `deploy/ listo — dependencias: ${EXTERNALS.join(', ')}` +
+    (projectId ? ` | params en .env.${projectId}` : ' | SIN params: proyecto no resuelto'),
+);
