@@ -23,7 +23,12 @@ import {
   connectFirestoreEmulator,
 } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
+import {
+  initializeAppCheck,
+  getToken as getAppCheckToken,
+  ReCaptchaEnterpriseProvider,
+  type AppCheck,
+} from 'firebase/app-check';
 
 const config = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -38,8 +43,9 @@ export const firebaseApp = initializeApp(config);
 
 // App Check: anillo 1 del modelo Zero-Trust
 const siteKey = import.meta.env.VITE_APPCHECK_SITE_KEY as string | undefined;
+let appCheck: AppCheck | undefined;
 if (siteKey && !import.meta.env.DEV) {
-  initializeAppCheck(firebaseApp, {
+  appCheck = initializeAppCheck(firebaseApp, {
     provider: new ReCaptchaEnterpriseProvider(siteKey),
     isTokenAutoRefreshEnabled: true,
   });
@@ -71,6 +77,31 @@ export const firebaseAuth = {
   resetPassword: (email: string) => sendPasswordResetEmail(authInstance, email),
   logout: () => signOut(authInstance),
   currentToken: async () => authInstance.currentUser?.getIdToken() ?? null,
+};
+
+// ---- App Check ----
+export const firebaseAppCheck = {
+  /**
+   * Token de atestación para la cabecera `X-Firebase-AppCheck`.
+   *
+   * `getToken` **espera** a que la atestación termine, y ahí está lo importante:
+   * App Check inicializa de forma asíncrona, así que sin este await las primeras
+   * peticiones de un arranque en frío saldrían sin atestar. El SDK cachea el
+   * token y lo renueva solo, de modo que el coste real es únicamente la primera
+   * llamada.
+   *
+   * Devuelve `null` —en vez de lanzar— cuando App Check no está activo (DEV,
+   * emuladores) o cuando la atestación falla. La petición sale sin la cabecera y
+   * **decide el servidor**: la política de rechazo vive en el backend, no acá.
+   */
+  currentToken: async (): Promise<string | null> => {
+    if (!appCheck) return null;
+    try {
+      return (await getAppCheckToken(appCheck)).token;
+    } catch {
+      return null;
+    }
+  },
 };
 
 export type { User };
